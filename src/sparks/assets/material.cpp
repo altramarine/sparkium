@@ -9,7 +9,7 @@ namespace sparks {
 
 namespace {
 std::unordered_map<std::string, MaterialType> material_name_map{
-    {"lambertian", MATERIAL_TYPE_LAMBERTIAN},
+    {"lambertian", MATERIAL_TYPE_LAMBERTIAN}, // diffusive?
     {"specular", MATERIAL_TYPE_SPECULAR},
     {"transmissive", MATERIAL_TYPE_TRANSMISSIVE},
     {"principled", MATERIAL_TYPE_PRINCIPLED},
