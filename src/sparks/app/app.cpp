@@ -518,6 +518,8 @@ void App::UpdateImGui() {
                              0.0f, 1e5f, "%.3f", ImGuiSliderFlags_Logarithmic);
       reset_accumulation_ |=
           ImGui::SliderFloat("Alpha", &material.alpha, 0.0f, 1.0f, "%.3f");
+      reset_accumulation_ |=
+        ImGui::SliderFloat("Transmissive_Rate", &material.transmissive_rate, 0.0f, 1.0f, "%.3f");
     }
 
 #if !defined(NDEBUG)
@@ -624,6 +626,9 @@ void App::UpdateImGui() {
 
 void App::UpdateDynamicBuffer() {
   GlobalUniformObject global_uniform_object{};
+
+  global_uniform_object.sample_algo = 0;
+
   global_uniform_object.projection =
       renderer_->GetScene().GetCamera().GetProjectionMatrix(
           float(core_->GetFramebufferWidth()) /

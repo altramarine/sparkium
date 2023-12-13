@@ -18,6 +18,7 @@ struct GlobalUniformObject {
   float clamp;
   float gamma;
   float aspect;
+  int sample_algo;
 };
 
 struct EntityUniformObject {

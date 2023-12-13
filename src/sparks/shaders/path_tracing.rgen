@@ -68,6 +68,142 @@ void TraceRay(vec3 origin, vec3 direction) {
 }
 
 vec3 SampleRay(vec3 origin, vec3 direction) {
+  if (guo.sample_algo == 2) { // RR
+    #define RATE 1.0/guo.num_bounces
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    do {
+      TraceRay(origin, direction); 
+      if (ray_payload.t == -1.0) {
+        
+      } else {
+        Material material = materials[hit_record.hit_entity_id];
+        if (material.material_type == MATERIAL_TYPE_EMISSION) {
+          radiance += throughput * material.emission * material.emission_strength;
+          break;
+        } else if (material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
+          if(dot(hit_record.normal, direction) > 0.0f) {
+            hit_record.normal = -hit_record.normal;
+          }
+          hit_record.normal = normalize(hit_record.normal);
+          float phi = RandomFloat() * PI;
+          float rho = RandomFloat() * 2 * PI;
+            // // std::cerr << RRR(rd) << std::endl;
+          vec3 wi = vec3 (
+            sin(rho) * cos(phi),
+            cos(rho) * cos(phi),
+            sin(phi)
+          );
+          wi = normalize(wi);
+          if(dot(hit_record.normal, wi) < 0.0f) {
+            wi = -wi;
+          }
+          // this is calculate shading
+          throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI) / (RATE); // if does not break, we will need this
+          origin = hit_record.position;
+          direction = wi;
+        } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
+          if(dot(hit_record.normal, direction) > 0.0f) {
+            hit_record.normal = -hit_record.normal;
+          }
+          hit_record.normal = normalize(hit_record.normal);
+          float phi = RandomFloat() * PI;
+          float rho = RandomFloat() * 2.0f * PI;
+            // // std::cerr << RRR(rd) << std::endl;
+          vec3 wi = direction - 2.0f * hit_record.normal;
+          if(dot(hit_record.normal, wi) < 0.0f) {
+            wi = -wi;
+          }
+          // this is calculate shading
+          origin = hit_record.position;
+          direction = wi;
+        } 
+        else {
+          throughput *= material.albedo_color *
+                        vec3(texture(texture_samplers[material.albedo_texture_id],
+                                    hit_record.tex_coord));
+          origin = hit_record.position;
+          direction = guo.envmap_light_direction;
+          radiance += throughput * guo.envmap_minor_color;
+          throughput *= max(dot(direction, hit_record.normal), 0.0) * 2.0;
+          TraceRay(origin, direction);
+          if (ray_payload.t < 0.0f) {
+            radiance += throughput * guo.envmap_major_color;
+          }
+          break;
+        }
+      }
+    } while( RandomFloat() < (RATE));
+    return radiance;
+  }
+  if (guo.sample_algo == 1) { // RR
+    #define RATE 1.0/guo.num_bounces
+    vec3 radiance = vec3(0.0);
+    vec3 throughput = vec3(1.0);
+    do {
+      TraceRay(origin, direction); 
+      if (ray_payload.t == -1.0) {
+        
+      } else {
+        Material material = materials[hit_record.hit_entity_id];
+        if (material.material_type == MATERIAL_TYPE_EMISSION) {
+          radiance += throughput * material.emission * material.emission_strength;
+          break;
+        } else if (material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
+          if(dot(hit_record.normal, direction) > 0.0f) {
+            hit_record.normal = -hit_record.normal;
+          }
+          hit_record.normal = normalize(hit_record.normal);
+          float phi = RandomFloat() * PI;
+          float rho = RandomFloat() * 2 * PI;
+            // // std::cerr << RRR(rd) << std::endl;
+          vec3 wi = vec3 (
+            sin(rho) * cos(phi),
+            cos(rho) * cos(phi),
+            sin(phi)
+          );
+          wi = normalize(wi);
+          if(dot(hit_record.normal, wi) < 0.0f) {
+            wi = -wi;
+          }
+          // this is calculate shading
+          throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI) / (RATE); // if does not break, we will need this
+          origin = hit_record.position;
+          direction = wi;
+        } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
+          if(dot(hit_record.normal, direction) > 0.0f) {
+            hit_record.normal = -hit_record.normal;
+          }
+          hit_record.normal = normalize(hit_record.normal);
+          float phi = RandomFloat() * PI;
+          float rho = RandomFloat() * 2.0f * PI;
+            // // std::cerr << RRR(rd) << std::endl;
+          vec3 wi = direction - 2.0f * hit_record.normal;
+          if(dot(hit_record.normal, wi) < 0.0f) {
+            wi = -wi;
+          }
+          // this is calculate shading
+          origin = hit_record.position;
+          direction = wi;
+        } 
+        else {
+          throughput *= material.albedo_color *
+                        vec3(texture(texture_samplers[material.albedo_texture_id],
+                                    hit_record.tex_coord));
+          origin = hit_record.position;
+          direction = guo.envmap_light_direction;
+          radiance += throughput * guo.envmap_minor_color;
+          throughput *= max(dot(direction, hit_record.normal), 0.0) * 2.0;
+          TraceRay(origin, direction);
+          if (ray_payload.t < 0.0f) {
+            radiance += throughput * guo.envmap_major_color;
+          }
+          break;
+        }
+      }
+    } while( RandomFloat() < (RATE));
+    return radiance;
+  }
   vec3 radiance = vec3(0.0);
   vec3 throughput = vec3(1.0);
   for (int b = 0; b < guo.num_bounces; b++) {
@@ -114,10 +250,10 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           wi = -wi;
         }
         // this is calculate shading
-        throughput *= 1;
         origin = hit_record.position;
         direction = wi;
-      } else {
+      } 
+      else {
         throughput *= material.albedo_color *
                       vec3(texture(texture_samplers[material.albedo_texture_id],
                                    hit_record.tex_coord));
