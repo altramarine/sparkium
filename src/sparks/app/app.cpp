@@ -626,9 +626,6 @@ void App::UpdateImGui() {
 
 void App::UpdateDynamicBuffer() {
   GlobalUniformObject global_uniform_object{};
-
-  global_uniform_object.sample_algo = 0;
-
   global_uniform_object.projection =
       renderer_->GetScene().GetCamera().GetProjectionMatrix(
           float(core_->GetFramebufferWidth()) /
