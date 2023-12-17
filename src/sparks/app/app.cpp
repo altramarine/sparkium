@@ -176,6 +176,9 @@ void App::OnInit() {
       std::make_unique<vulkan::framework::DynamicBuffer<Material>>(core_.get(),
                                                                    16384);
 
+  light_sources_uniform_buffer_ = 
+      std::make_unique<vulkan::framework::DynamicBuffer<uint32_t>>(core_.get(),
+                                                                   16384);
   std::vector<glm::vec2> vertices{
       {0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
   std::vector<uint32_t> indices{0, 1, 2, 1, 2, 3};
@@ -666,11 +669,21 @@ void App::UpdateDynamicBuffer() {
           30.0f, 10000.0f);
   global_uniform_buffer_far_->operator[](0) = global_uniform_object;
   auto &entities = renderer_->GetScene().GetEntities();
+  int n_light = 1;
+  int n_faces = 0;
   for (int i = 0; i < entities.size(); i++) {
     auto &entity = entities[i];
     entity_uniform_buffer_->operator[](i).model = entity.GetTransformMatrix();
     material_uniform_buffer_->operator[](i) = entity.GetMaterial();
+    if(entity.GetMaterial().material_type == MATERIAL_TYPE_EMISSION) {
+      light_sources_uniform_buffer_->operator[](++n_light) = i;
+      int faces = entity.GetModel()->GetIndices().size() / 3;
+      light_sources_uniform_buffer_->operator[](++n_light) = faces;
+      n_faces += faces;
+    }
   }
+  light_sources_uniform_buffer_->operator[](0) = n_light;
+  light_sources_uniform_buffer_->operator[](1) = n_faces;
 }
 
 void App::UpdateHostStencilBuffer() {
@@ -1128,6 +1141,8 @@ void App::BuildRayTracingPipeline() {
   ray_tracing_render_node_->AddBufferBinding(ray_tracing_vertex_buffer_.get(),
                                              VK_SHADER_STAGE_RAYGEN_BIT_KHR);
   ray_tracing_render_node_->AddBufferBinding(ray_tracing_index_buffer_.get(),
+                                             VK_SHADER_STAGE_RAYGEN_BIT_KHR);
+  ray_tracing_render_node_->AddBufferBinding(light_sources_uniform_buffer_.get(),
                                              VK_SHADER_STAGE_RAYGEN_BIT_KHR);
   ray_tracing_render_node_->AddUniformBinding(binding_texture_samplers_,
                                               VK_SHADER_STAGE_RAYGEN_BIT_KHR);
