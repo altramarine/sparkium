@@ -102,6 +102,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
       } else {
 
         Material material = materials[hit_record.hit_entity_id];
+        vec3 hit_record_normal = hit_record.normal;
         if(dot(hit_record.normal, direction) > 0.0f) {
           hit_record.normal = -hit_record.normal;
         }
@@ -122,7 +123,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           d /= d.x + d.y + d.z;
           vec3 pt = d.x * nd0.position + d.y * nd1.position + d.z * nd2.position;
           vec3 N = cross(nd1.position - nd0.position, nd2.position - nd0.position);
-          float S = length(N) / 2.0f;
+          float S = length(N);
           N = normalize(N);
           vec3 Origin = hit_record.position;
           vec3 wi = normalize(pt - hit_record.position);
@@ -135,7 +136,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           } else {
             Material light_m = materials[hit_record_0.hit_entity_id];
             if(length(hit_record_0.position - pt)  < 1e-3 && light_m.material_type == MATERIAL_TYPE_EMISSION) {
-              vec3 radiance_dir = light_m.emission * light_m.emission_strength / (2 * PI)
+              vec3 radiance_dir = light_m.emission * light_m.emission_strength * INV_PI / 2
                           * (material.albedo_color / PI) // diffusive
                           * dot(normalize(hit_record.normal), wi) // cosine
                           * dot(N, -wi) // cosine
@@ -181,6 +182,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           origin = hit_record.position;
           direction = wi;
         } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
+          hit_record.normal = hit_record_normal;
           if(dot(hit_record.normal, direction) > 0.0f) {
             hit_record.normal = -hit_record.normal;
           }
@@ -195,7 +197,26 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           // this is calculate shading
           origin = hit_record.position;
           direction = wi;
-        } 
+        } else if (material.material_type == MATERIAL_TYPE_TRANSMISSIVE) {
+          vec3 median = -dot(direction, hit_record.normal) * hit_record.normal;
+          vec3 proj_x = normalize(direction + median);
+          vec3 proj_y = hit_record.normal; 
+          // theta: 初始角度，phi: 穿过后角度
+          float cos_theta = dot(hit_record.normal, direction);
+          float sin_theta = sqrt(1-cos_theta*cos_theta);
+          float sin_phi, cos_phi;
+          float eta = material.transmissive_rate;
+          if (cos_theta < 0) {
+            proj_y = -proj_y;
+            cos_theta = -cos_theta;
+          } else{
+            eta = 1.0 / eta;
+          }
+          sin_phi = eta * sin_theta;
+          cos_phi = sqrt(1-sin_phi*sin_phi);
+          origin = hit_record.position;
+          direction = cos_phi * proj_y + sin_phi * proj_x;
+        }
         else {
           throughput *= material.albedo_color *
                         vec3(texture(texture_samplers[material.albedo_texture_id],
@@ -212,6 +233,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
         }
         if(material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
           light_sampled = true;
+          // light_sampled = false;
         } else {
           light_sampled = false;
         }
