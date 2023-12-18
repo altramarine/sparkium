@@ -122,7 +122,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           d /= d.x + d.y + d.z;
           vec3 pt = d.x * nd0.position + d.y * nd1.position + d.z * nd2.position;
           vec3 N = cross(nd1.position - nd0.position, nd2.position - nd0.position);
-          float S = length(N);
+          float S = length(N) / 2.0f;
           N = normalize(N);
           vec3 Origin = hit_record.position;
           vec3 wi = normalize(pt - hit_record.position);
@@ -164,17 +164,18 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           }
           vec3 dirx = normalize(wi - dot(wi, hit_record.normal) * hit_record.normal);
           vec3 diry = cross(hit_record.normal, dirx);
-          float rr = abs(RandomFloat());
+          float rr = RandomFloat();
           float rr2 = RandomFloat() * 2 * PI;
           float cosine = sqrt(1.0f - rr);
           float sine = sqrt(rr);
           wi = sine * cos(rr2) * dirx + sine * sin(rr2) * diry + cosine * hit_record.normal;
-          wi = normalize(wi);
+          // wi = normalize(wi);
           
           // we get true wi until now. (Cosine-weighted)
-          float pdf = 2.0 * sine * cosine / (PI);
+          float pdf = /* 2.0f * sine * cosine */1.0f * cosine / (PI);
+          // float pdf = 1.0 / (2.0 * PI);
           // this is calculate shading
-          throughput *= cosine * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) / pdf;
+          throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) / pdf;
           // this is calculate shading
           // throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI);
           origin = hit_record.position;
@@ -187,7 +188,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           float phi = RandomFloat() * PI;
           float rho = RandomFloat() * 2.0f * PI;
             // // std::cerr << RRR(rd) << std::endl;
-          vec3 wi = direction - 2.0f * hit_record.normal;
+          vec3 wi = direction - 2.0f * dot(direction, hit_record.normal) * hit_record.normal;
           if(dot(hit_record.normal, wi) < 0.0f) {
             wi = -wi;
           }
@@ -211,6 +212,8 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
         }
         if(material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
           light_sampled = true;
+        } else {
+          light_sampled = false;
         }
       }
     }
