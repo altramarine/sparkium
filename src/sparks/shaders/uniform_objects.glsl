@@ -28,4 +28,5 @@ struct EntityUniformObject {
 struct ObjectInfo {
   uint vertex_offset;
   uint index_offset;
+  uint num_faces;
 };

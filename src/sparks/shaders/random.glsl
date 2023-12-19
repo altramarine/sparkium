@@ -29,6 +29,10 @@ float RandomFloat() {
   return float(WangHash(random_device.seed)) / 4294967296.0;
 }
 
+int RandomInt(int n) {
+  return int(floor(RandomFloat() * n));
+}
+
 vec2 RandomOnCircle() {
   float theta = RandomFloat() * PI * 2.0;
   return vec2(sin(theta), cos(theta));

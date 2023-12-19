@@ -735,7 +735,8 @@ void App::UpdateDeviceAssets() {
               vulkan::raytracing::BottomLevelAccelerationStructure>(
               core_->GetDevice(), core_->GetCommandPool(), vertices, indices));
       object_info_data_.push_back({uint32_t(ray_tracing_vertex_data_.size()),
-                                   uint32_t(ray_tracing_index_data_.size())});
+                                   uint32_t(ray_tracing_index_data_.size()),
+                                   uint32_t(indices.size() / 3)});
       ray_tracing_vertex_data_.insert(ray_tracing_vertex_data_.end(),
                                       vertices.begin(), vertices.end());
       ray_tracing_index_data_.insert(ray_tracing_index_data_.end(),
