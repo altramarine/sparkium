@@ -522,7 +522,7 @@ void App::UpdateImGui() {
       reset_accumulation_ |=
           ImGui::SliderFloat("Alpha", &material.alpha, 0.0f, 1.0f, "%.3f");
       reset_accumulation_ |=
-        ImGui::SliderFloat("Transmissive_Rate", &material.transmissive_rate, 0.0f, 1.0f, "%.3f");
+        ImGui::SliderFloat("Transmissive_Rate", &material.iot, 1.0f, 2.0f, "%.3f");
     }
 
 #if !defined(NDEBUG)

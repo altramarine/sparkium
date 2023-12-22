@@ -86,7 +86,7 @@ void TraceRay_0(vec3 origin, vec3 direction) {
               direction, tmax, 0);
   hit_record_0 = GetHitRecord(ray_payload, origin, direction);
 }
-float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo, int idx) {
+float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo, int idx) { // for MIS.
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
   TraceRay_0(origin, wi);
@@ -226,12 +226,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
 
           light_sampled = get_pdf_ratio(origin, direction, hit_record.normal, -safe_direction, 1);
         } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
-          if(dot(hit_record.normal, direction) > 0.0f) {
-            hit_record.normal = -hit_record.normal;
-          }
           hit_record.normal = normalize(hit_record.normal);
-          float phi = RandomFloat() * PI;
-          float rho = RandomFloat() * 2.0f * PI;
             // // std::cerr << RRR(rd) << std::endl;
           vec3 wi = direction - 2.0f * dot(direction, hit_record.normal) * hit_record.normal;
           if(dot(hit_record.normal, wi) < 0.0f) {
@@ -243,25 +238,38 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
 
           // light_sampled = get_pdf_ratio(origin, direction, hit_record.normal, -direction, 1);
         } else if (material.material_type == MATERIAL_TYPE_TRANSMISSIVE) {
-          hit_record.normal = hit_record_normal;
-          vec3 median = -dot(direction, hit_record.normal) * hit_record.normal;
+          // hit_record.normal = hit_record_normal;
+          vec3 median = -dot(direction, hit_record_normal) * hit_record_normal;
           vec3 proj_x = normalize(direction + median);
-          vec3 proj_y = hit_record.normal; 
+          vec3 proj_y = hit_record_normal; 
           // theta: 初始角度，phi: 穿过后角度
-          float cos_theta = dot(hit_record.normal, direction);
+          float cos_theta = dot(hit_record_normal, direction);
           float sin_theta = sqrt(1-cos_theta*cos_theta);
           float sin_phi, cos_phi;
-          float eta = material.transmissive_rate;
+          float eta_i = 1.0;
+          float eta_o = material.iot;
+          float eta = 1.0 / material.iot;
           if (cos_theta < 0) {
             proj_y = -proj_y;
             cos_theta = -cos_theta;
           } else{
             eta = 1.0 / eta;
+            eta_i = material.iot;
+            eta_o = 1.0;
           }
-          sin_phi = eta * sin_theta;
-          cos_phi = sqrt(1-sin_phi*sin_phi);
-          origin = hit_record.position;
-          direction = cos_phi * proj_y + sin_phi * proj_x;
+          float f0 = pow((eta_i - eta_o) / (eta_i + eta_o), 2);
+          float fresnel = f0 + (1.0f - f0) * pow(1.0 - abs(cos_theta), 5);
+          if(RandomFloat() > fresnel) {
+            sin_phi = eta * sin_theta;
+            cos_phi = sqrt(1-sin_phi*sin_phi);
+            origin = hit_record.position;
+            direction = cos_phi * proj_y + sin_phi * proj_x;
+          } else {
+            vec3 wi = direction - 2.0f * dot(direction, hit_record.normal) * hit_record.normal;
+            // this is calculate shading
+            origin = hit_record.position;
+            direction = wi;
+          }
         } else {
           throughput *= material.albedo_color *
                         vec3(texture(texture_samplers[material.albedo_texture_id],
@@ -286,72 +294,72 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
     } while(RandomFloat() < RATE);
     return radiance;
   }
-  vec3 radiance = vec3(0.0);
-  vec3 throughput = vec3(1.0);
-  for (int b = 0; b < guo.num_bounces; b++) {
-    TraceRay(origin, direction); 
-    if (ray_payload.t == -1.0) {
-      radiance += throughput * SampleEnvmap(direction);
-      break;
-    } else {
-      Material material = materials[hit_record.hit_entity_id];
-      if (material.material_type == MATERIAL_TYPE_EMISSION) {
-        radiance += throughput * material.emission * material.emission_strength;
-        break;
-      } else if (material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
-        if(dot(hit_record.normal, direction) > 0.0f) {
-          hit_record.normal = -hit_record.normal;
-        }
-        hit_record.normal = normalize(hit_record.normal);
-        float phi = RandomFloat() * PI;
-        float rho = RandomFloat() * 2 * PI;
-          // // std::cerr << RRR(rd) << std::endl;
-        vec3 wi = vec3 (
-          sin(rho) * cos(phi),
-          cos(rho) * cos(phi),
-          sin(phi)
-        );
-        wi = normalize(wi);
-        if(dot(hit_record.normal, wi) < 0.0f) {
-          wi = -wi;
-        }
-        // this is calculate shading
-        throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI);
-        origin = hit_record.position;
-        direction = wi;
-      } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
-        if(dot(hit_record.normal, direction) > 0.0f) {
-          hit_record.normal = -hit_record.normal;
-        }
-        hit_record.normal = normalize(hit_record.normal);
-        float phi = RandomFloat() * PI;
-        float rho = RandomFloat() * 2.0f * PI;
-          // // std::cerr << RRR(rd) << std::endl;
-        vec3 wi = direction - 2.0f * hit_record.normal;
-        if(dot(hit_record.normal, wi) < 0.0f) {
-          wi = -wi;
-        }
-        // this is calculate shading
-        origin = hit_record.position;
-        direction = wi;
-      } 
-      else {
-        throughput *= material.albedo_color *
-                      vec3(texture(texture_samplers[material.albedo_texture_id],
-                                   hit_record.tex_coord));
-        origin = hit_record.position;
-        direction = guo.envmap_light_direction;
-        radiance += throughput * guo.envmap_minor_color;
-        throughput *= max(dot(direction, hit_record.normal), 0.0) * 2.0;
-        TraceRay(origin, direction);
-        if (ray_payload.t < 0.0f) {
-          radiance += throughput * guo.envmap_major_color;
-        }
-        break;
-      }
-    }
-  }
-  return radiance;
+  // vec3 radiance = vec3(0.0);
+  // vec3 throughput = vec3(1.0);
+  // for (int b = 0; b < guo.num_bounces; b++) {
+  //   TraceRay(origin, direction); 
+  //   if (ray_payload.t == -1.0) {
+  //     radiance += throughput * SampleEnvmap(direction);
+  //     break;
+  //   } else {
+  //     Material material = materials[hit_record.hit_entity_id];
+  //     if (material.material_type == MATERIAL_TYPE_EMISSION) {
+  //       radiance += throughput * material.emission * material.emission_strength;
+  //       break;
+  //     } else if (material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
+  //       if(dot(hit_record.normal, direction) > 0.0f) {
+  //         hit_record.normal = -hit_record.normal;
+  //       }
+  //       hit_record.normal = normalize(hit_record.normal);
+  //       float phi = RandomFloat() * PI;
+  //       float rho = RandomFloat() * 2 * PI;
+  //         // // std::cerr << RRR(rd) << std::endl;
+  //       vec3 wi = vec3 (
+  //         sin(rho) * cos(phi),
+  //         cos(rho) * cos(phi),
+  //         sin(phi)
+  //       );
+  //       wi = normalize(wi);
+  //       if(dot(hit_record.normal, wi) < 0.0f) {
+  //         wi = -wi;
+  //       }
+  //       // this is calculate shading
+  //       throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI);
+  //       origin = hit_record.position;
+  //       direction = wi;
+  //     } else if (material.material_type == MATERIAL_TYPE_SPECULAR) {
+  //       if(dot(hit_record.normal, direction) > 0.0f) {
+  //         hit_record.normal = -hit_record.normal;
+  //       }
+  //       hit_record.normal = normalize(hit_record.normal);
+  //       float phi = RandomFloat() * PI;
+  //       float rho = RandomFloat() * 2.0f * PI;
+  //         // // std::cerr << RRR(rd) << std::endl;
+  //       vec3 wi = direction - 2.0f * hit_record.normal;
+  //       if(dot(hit_record.normal, wi) < 0.0f) {
+  //         wi = -wi;
+  //       }
+  //       // this is calculate shading
+  //       origin = hit_record.position;
+  //       direction = wi;
+  //     } 
+  //     else {
+  //       throughput *= material.albedo_color *
+  //                     vec3(texture(texture_samplers[material.albedo_texture_id],
+  //                                  hit_record.tex_coord));
+  //       origin = hit_record.position;
+  //       direction = guo.envmap_light_direction;
+  //       radiance += throughput * guo.envmap_minor_color;
+  //       throughput *= max(dot(direction, hit_record.normal), 0.0) * 2.0;
+  //       TraceRay(origin, direction);
+  //       if (ray_payload.t < 0.0f) {
+  //         radiance += throughput * guo.envmap_major_color;
+  //       }
+  //       break;
+  //     }
+  //   }
+  // }
+  return vec3(0.0f);
 }
 
 void main() {

@@ -5,8 +5,9 @@ struct Material {
   vec3 emission;
   float emission_strength;
   float alpha;
-  float transmissive_rate;
+  float iot;
   uint material_type;
+  float others[1 + 8];
 };
 
 #define MATERIAL_TYPE_LAMBERTIAN 0

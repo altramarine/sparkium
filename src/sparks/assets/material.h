@@ -21,9 +21,9 @@ struct Material {
   glm::vec3 emission{0.0f};
   float emission_strength{1.0f};
   float alpha{1.0f};
-  float transmissive_rate{1.0f};
+  float iot{1.0f};
   MaterialType material_type{MATERIAL_TYPE_LAMBERTIAN};
-  float reserve[1]{};
+  float reserve[1 + 8]{};
   Material() = default;
   explicit Material(const glm::vec3 &albedo);
   Material(Scene *scene, const tinyxml2::XMLElement *material_element);
