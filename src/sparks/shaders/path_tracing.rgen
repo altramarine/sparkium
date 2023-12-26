@@ -86,6 +86,18 @@ void TraceRay_0(vec3 origin, vec3 direction) {
               direction, tmax, 0);
   hit_record_0 = GetHitRecord(ray_payload, origin, direction);
 }
+
+vec3 calculate_brdf(vec3 n, vec3 wi, vec3 wo, float D, vec3 h, float alpha, vec3 F0) {
+  float roughness = sqrt(alpha);
+  float k = pow(roughness + 1.0f, 2) / 8.0f;
+  float G_i = dot(n, wi) / (dot(n, wi) * (1 - k) + k);
+  float G_o = dot(n, wo) / (dot(n, wo) * (1 - k) + k);
+  vec3 fresnel = F0 + (vec3(1.0) - F0) * pow(1.0f - dot(h, wi), 5.0f);
+  float G = G_i * G_o;
+  // if(dot(n, wi) < 0.0f || dot(n, wo) < 0.0f) return 0.1f;
+  return (fresnel * G * D / (4.0f * dot(n, wi) * dot(n, wo)) + (vec3(1.0f) - fresnel) / PI)* dot(wi, n);
+}
+
 float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo, int idx) { // for MIS.
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
@@ -110,6 +122,44 @@ float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal
   hit_record_0 = hit_record_p;
   rpl = ray_payload;
   s[1] = dot(normal, wi) / PI;
+  // return 1 - idx;
+  // return 1 / 2;
+  // return idx == 1 ? 0.2 : 0.8;
+  return s[idx] * s[idx] / (s[0] * s[0] + s[1] * s[1] + s[2] * s[2]);
+}
+
+float D_alpha(vec3 wi, vec3 N, vec3 h, float alpha) {
+  return pow(alpha, 2) / (PI * pow((pow(alpha, 2) - 1) * pow(dot(N, h), 2) + 1, 2));
+}
+
+float get_pdf_ratio_principled(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo,  float alpha, int idx) { // for MIS.
+  HitRecord hit_record_p = hit_record_0;
+  RayPayload rpl = ray_payload;
+  TraceRay_0(origin, wi);
+  Material material = materials[hit_record_0.hit_entity_id];
+  float s[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (material.material_type == MATERIAL_TYPE_EMISSION) {
+    vec3 N = hit_record_0.normal;
+    if(dot(wi, N) > 0.0f) {
+      N = -N;
+    }
+    float S = length(hit_record_0.geometry_normal) / 2;
+    // vec3 L_direct = throughput * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * radiance_dir;
+    float sampling_the_light_pdf = dot(N, -wi) // cosine
+                * S / pow(length(hit_record_0.position - origin),2)
+                * light_sources[0] * object_infos[hit_record_0.hit_entity_id].num_faces;
+    if(sampling_the_light_pdf != 0.0f) {
+      sampling_the_light_pdf = 1.0f / sampling_the_light_pdf;
+    }
+    s[0] = sampling_the_light_pdf;
+  }
+  hit_record_0 = hit_record_p;
+  rpl = ray_payload;
+  vec3 h = normalize(wi + wo);
+  if(length(h - normal) < 1e-5 )
+  // vec3 N = normalize(wi + wo);
+  s[1] = D_alpha(wi, normal, h, alpha) * dot(normal, h) / dot(h, wi);
+  if(alpha < 0.1f) {return idx == 1 ? 1.0f: 0.0f;}
   // return 1 - idx;
   // return 1 / 2;
   // return idx == 1 ? 0.2 : 0.8;
@@ -139,7 +189,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
         }
 
         // SEARCH_TARGET::: sample the light: 
-        if(material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
+        if(material.material_type == MATERIAL_TYPE_LAMBERTIAN || material.material_type == MATERIAL_TYPE_PRINCIPLED) {
           int n_lights = int(light_sources[0]);
           int r = RandomInt(n_lights) + 1;
           int face_cnt = light_sources[2 * r + 1];
@@ -172,11 +222,22 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
             Material light_m = materials[hit_record_0.hit_entity_id];
             if(length(hit_record_0.position - pt)  < 1e-3 && light_m.material_type == MATERIAL_TYPE_EMISSION) {
               vec3 radiance_dir = light_m.emission * light_m.emission_strength
-                          * max(0.0f, dot(normalize(hit_record.normal), wi)) // cosine
+                          * max(0.0f, dot(hit_record.normal, wi)) // cosine
                           * dot(N, -wi) // cosine
                           * S / pow(length(hit_record_0.position - Origin),2)
                           * n_lights * face_cnt;
               vec3 L_direct = throughput * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * radiance_dir;
+              if(material.material_type == MATERIAL_TYPE_PRINCIPLED) {
+                if(dot(hit_record.normal, wi) > 0) {
+                  float DD = D_alpha(wi, hit_record.normal, normalize(wi - direction), material.alpha);
+                  vec3 wo = -direction;
+                  vec3 h = normalize(wi + wo);
+                  if(material.alpha == 0.0f) h = hit_record.normal;
+                  L_direct = throughput * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * radiance_dir * 
+                  calculate_brdf(hit_record.normal, wi, wo, DD, h, material.alpha, material.albedo_color) / dot(hit_record.normal, wi);
+                } else
+                  L_direct = vec3(0.0f);
+              }
               float sampling_the_light_pdf = dot(N, -wi) // cosine
                           * S / pow(length(hit_record_0.position - Origin),2)
                           * n_lights * face_cnt;
@@ -184,7 +245,10 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
                 sampling_the_light_pdf = 1.0f / sampling_the_light_pdf;
               }
               // if(sampling_the_light_pdf != 0.0f)
-              radiance += L_direct * get_pdf_ratio(Origin, wi, hit_record.normal, -direction, 0);
+              if(material.material_type == MATERIAL_TYPE_LAMBERTIAN)
+                radiance += L_direct * get_pdf_ratio(Origin, wi, hit_record.normal, -direction, 0);
+              else 
+                radiance += L_direct * get_pdf_ratio_principled(Origin, wi, hit_record.normal, -direction, material.alpha, 0);
             }
           }
         }
@@ -270,6 +334,35 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
             origin = hit_record.position;
             direction = wi;
           }
+        } else if (material.material_type == MATERIAL_TYPE_PRINCIPLED){
+          // GGX sampling:
+          float epsilon = RandomFloat();
+          float cosine = sqrt((1.0f - epsilon) / (epsilon * (pow(material.alpha, 2) - 1.0f) + 1));
+          if(material.alpha == 0.0f) cosine = 1.0f;
+          float sine = sqrt(1.0f - cosine * cosine);
+          float rr = RandomFloat() * 2 * PI;
+          vec3 wi = RandomOnSphere();
+          hit_record.normal = normalize(hit_record.normal);
+          if(dot(hit_record.normal, wi) < 0.0f) {
+            wi = -wi;
+          }
+          vec3 dirx = normalize(wi - dot(wi, hit_record.normal) * hit_record.normal);
+          vec3 diry = cross(hit_record.normal, dirx);
+          vec3 h = normalize(dirx * sine * cos(rr) + diry * sine * sin(rr) + hit_record.normal * cosine);
+          vec3 wo = normalize(-direction);
+          wi = direction - 2.0f * dot(direction, h) * h;
+          if(dot(wi, hit_record.normal) <= 0.0f) {
+            break;
+          } 
+          float roughness = sqrt(material.alpha);
+            throughput *= /* material.albedo_color *  */vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
+            float D = 4 * dot(wo, h);
+            // if(length(h - hit_record.normal) > 1e-4)
+            throughput *= 1.0f * calculate_brdf(hit_record.normal, wi, wo, D, h, material.alpha, material.albedo_color);
+            origin = hit_record.position;
+            direction = wi;
+          // h is sampled
+          light_sampled = get_pdf_ratio_principled(origin, direction, hit_record.normal, -safe_direction, material.alpha, 1);
         } else {
           throughput *= material.albedo_color *
                         vec3(texture(texture_samplers[material.albedo_texture_id],
@@ -285,7 +378,9 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           break;
         }
         if(material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
-          // light_sampled = get_pdf_ratio(origin, direction, hit_record.normal, -safe_direction, 1);
+          // light_sampled = get_pdf_ratio(origin, direction, hit_record.normal, -safe_direction, 1);        
+        } else if (material.material_type == MATERIAL_TYPE_PRINCIPLED) {
+
         } else {
           light_sampled = 1.0f;
         }
