@@ -517,6 +517,8 @@ void App::UpdateImGui() {
           "Emission", &material.emission[0],
           ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_Float);
       reset_accumulation_ |=
+          scene.TextureCombo("Emission Texture", &material.emission_texture_id);
+      reset_accumulation_ |=
           ImGui::SliderFloat("Emission Strength", &material.emission_strength,
                              0.0f, 1e5f, "%.3f", ImGuiSliderFlags_Logarithmic);
       reset_accumulation_ |=

@@ -88,12 +88,16 @@ void TraceRay_0(vec3 origin, vec3 direction) {
 }
 
 vec3 calculate_brdf(vec3 n, vec3 wi, vec3 wo, float D, vec3 h, float alpha, vec3 F0) {
-  float roughness = sqrt(alpha);
-  float k = pow(roughness + 1.0f, 2) / 8.0f;
-  float G_i = dot(n, wi) / (dot(n, wi) * (1 - k) + k);
-  float G_o = dot(n, wo) / (dot(n, wo) * (1 - k) + k);
-  vec3 fresnel = F0 + (vec3(1.0) - F0) * pow(1.0f - dot(h, wi), 5.0f);
+  // float roughness = alpha;
+  // float k = pow(roughness + 1.0f, 2) / 8.0f;
+  float k = (alpha * alpha) / 2.0f;
+  float G_i = dot(n, wi) / (dot(n, wi) * (1.0f - k) + k);
+  float G_o = dot(n, wo) / (dot(n, wo) * (1.0f - k) + k);
+  vec3 fresnel = F0 + (vec3(1.0f) - F0) * pow(1.0f - dot(h, wi), 5.0f);
   float G = G_i * G_o;
+  if(alpha == 0.0f) {
+    return G * fresnel;
+  }
   // if(dot(n, wi) < 0.0f || dot(n, wo) < 0.0f) return 0.1f;
   return (fresnel * G * D / (4.0f * dot(n, wi) * dot(n, wo)))* dot(wi, n);
 }
@@ -156,7 +160,7 @@ float get_pdf_ratio_principled(vec3 origin, vec3 wi /* should be normalized */, 
   hit_record_0 = hit_record_p;
   rpl = ray_payload;
   vec3 h = normalize(wi + wo);
-  if(length(h - normal) < 1e-5 )
+  // if(length(h - normal) < 1e-5 )
   // vec3 N = normalize(wi + wo);
   s[1] = D_alpha(wi, normal, h, alpha) * dot(normal, h) / dot(h, wi);
   if(alpha < 0.1f) {return idx == 1 ? 1.0f: 0.0f;}
@@ -177,7 +181,8 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
       // vec3 L_direct = vec3(0.0f);
       TraceRay(origin, direction); 
       if (ray_payload.t == -1.0) {
-        radiance += throughput * SampleEnvmap(direction);
+        vec3 t = SampleEnvmap(direction);
+        radiance += throughput * t;
         break;
       } else {
         vec3 safe_direction = direction;
@@ -252,8 +257,13 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
             }
           }
         }
-
-
+        if (material.material_type != MATERIAL_TYPE_EMISSION) {
+          vec3 emission = material.emission * vec3(texture(texture_samplers[material.emission_texture_id],hit_record.tex_coord));
+          if(emission != vec3(0.0f)) {
+            radiance += throughput * emission * material.emission_strength;
+            break;
+          }
+        }
         if (material.material_type == MATERIAL_TYPE_EMISSION) {
           // if(!light_sampled) 
           // radiance += throughput * material.emission * material.emission_strength;
@@ -276,13 +286,12 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           float cosine = sqrt(1.0f - rr);
           float sine = sqrt(rr);
           wi = sine * cos(rr2) * dirx + sine * sin(rr2) * diry + cosine * hit_record.normal;
-          // wi = normalize(wi);
           
           // we get true wi until now. (Cosine-weighted)
           float pdf = /* 2.0f * sine * cosine */1.0f * cosine / (PI);
           // float pdf = 1.0 / (2.0 * PI);
           // this is calculate shading
-          throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) / pdf;
+          throughput *= material.albedo_color * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
           // this is calculate shading
           // throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI);
           origin = hit_record.position;
@@ -293,10 +302,11 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           hit_record.normal = normalize(hit_record.normal);
             // // std::cerr << RRR(rd) << std::endl;
           vec3 wi = direction - 2.0f * dot(direction, hit_record.normal) * hit_record.normal;
-          if(dot(hit_record.normal, wi) < 0.0f) {
-            wi = -wi;
-          }
+          // if(dot(hit_record.normal, wi) < 0.0f) {
+          //   wi = -wi;
+          // }
           // this is calculate shading
+          throughput *= /* material.albedo_color *  */vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
           origin = hit_record.position;
           direction = wi;
 
@@ -349,18 +359,20 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           vec3 dirx = normalize(wi - dot(wi, hit_record.normal) * hit_record.normal);
           vec3 diry = cross(hit_record.normal, dirx);
           vec3 h = normalize(dirx * sine * cos(rr) + diry * sine * sin(rr) + hit_record.normal * cosine);
-          vec3 wo = normalize(-direction);
+          if(material.alpha == 0.0f) {
+            h = hit_record.normal;
+          }
+          vec3 wo = -direction;
           wi = direction - 2.0f * dot(direction, h) * h;
           if(dot(wi, hit_record.normal) <= 0.0f) {
             break;
           } 
-          float roughness = sqrt(material.alpha);
-            throughput *= /* material.albedo_color *  */vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
-            float D = 4 * dot(wo, h);
-            // if(length(h - hit_record.normal) > 1e-4)
-            throughput *= 1.0f * calculate_brdf(hit_record.normal, wi, wo, D, h, material.alpha, material.albedo_color);
-            origin = hit_record.position;
-            direction = wi;
+          throughput *= /* material.albedo_color *  */vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
+          float D = 4.0f * dot(wo, h);
+          // if(length(h - hit_record.normal) > 1e-4)
+          throughput *= 1.0f * calculate_brdf(hit_record.normal, wi, wo, D, h, material.alpha, material.albedo_color);
+          origin = hit_record.position;
+          direction = wi;
           // h is sampled
           light_sampled = get_pdf_ratio_principled(origin, direction, hit_record.normal, -safe_direction, material.alpha, 1);
         } else {
@@ -466,10 +478,19 @@ void main() {
   for (int i = 0; i < guo.num_samples; i++) {
     InitRandomSeed(uint(pixelCenter.x), uint(pixelCenter.y),
                    guo.accumulated_sample + i);
-    vec4 origin = camera_to_world * vec4(0, 0, 0, 1);
-    vec4 target = screen_to_camera * vec4(d.x, d.y, 1, 1);
-    vec4 direction = camera_to_world * vec4(normalize(target.xyz), 0);
-
+    
+    // vec4 origin = camera_to_world * vec4(0, 0, 0, 1);
+    // vec4 target = screen_to_camera * vec4(d.x, d.y, 1, 1);
+    // vec4 direction = camera_to_world * vec4(normalize(target.xyz), 0);
+    vec2 pixelPoint = vec2(gl_LaunchIDEXT.x + RandomFloat(), gl_LaunchIDEXT.y + RandomFloat()); 
+    vec2 inUV = pixelPoint / vec2(gl_LaunchSizeEXT.x, gl_LaunchSizeEXT.y);
+    vec2 d = inUV * 2.0 - 1.0;
+    vec3 o_ = vec3(RandomInCircle() * guo.aperture, 0); // origin
+    vec3 t_ = vec3(screen_to_camera * vec4(d.x, d.y, 1, 1)); // target
+    vec3 f_ = normalize(t_) * guo.focal_length; // focal
+    vec3 d_ = normalize(f_ - o_); // direct
+    vec4 origin = camera_to_world * vec4(o_, 1);
+    vec4 direction = camera_to_world * vec4(d_, 0);
     imageStore(accumulation_color, ivec2(gl_LaunchIDEXT.xy),
                imageLoad(accumulation_color, ivec2(gl_LaunchIDEXT.xy)) +
                    vec4(SampleRay(origin.xyz, direction.xyz), 1.0));

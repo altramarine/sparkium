@@ -6,8 +6,9 @@ struct Material {
   float emission_strength;
   float alpha;
   float iot;
+  int emission_texture_id;
   uint material_type;
-  float others[1 + 8];
+  float others[8];
 };
 
 #define MATERIAL_TYPE_LAMBERTIAN 0

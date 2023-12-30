@@ -60,6 +60,16 @@ Material::Material(Scene *scene, const tinyxml2::XMLElement *material_element)
     iot = std::stof(child_element->FindAttribute("value")->Value());
   }
 
+  child_element = material_element->FirstChildElement("emission_texture");
+  if (child_element) {
+    std::string path = child_element->FindAttribute("value")->Value();
+    Texture emission_texture(1, 1);
+    if (Texture::Load(path, emission_texture)) {
+      emission_texture_id =
+          scene->AddTexture(emission_texture, PathToFilename(path));
+    }
+  }
+
   material_type =
       material_name_map[material_element->FindAttribute("type")->Value()];
 }
