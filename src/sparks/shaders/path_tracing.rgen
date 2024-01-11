@@ -103,6 +103,10 @@ vec3 calculate_brdf(vec3 n, vec3 wi, vec3 wo, float D, vec3 h, float alpha, vec3
 }
 
 float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo, int idx) { // for MIS.
+  int n_lights = int(light_sources[0]);
+  if(n_lights != 0) {
+    return idx == 0 ? 1.0f : 0.0f;
+  }
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
   TraceRay_0(origin, wi);
@@ -137,6 +141,10 @@ float D_alpha(vec3 wi, vec3 N, vec3 h, float alpha) {
 }
 
 float get_pdf_ratio_principled(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo,  float alpha, int idx) { // for MIS.
+  int n_lights = int(light_sources[0]);
+  if(n_lights != 0) {
+    return idx == 0 ? 1.0f : 0.0f;
+  }
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
   TraceRay_0(origin, wi);
@@ -194,8 +202,8 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
         }
 
         // SEARCH_TARGET::: sample the light: 
-        if(material.material_type == MATERIAL_TYPE_LAMBERTIAN || material.material_type == MATERIAL_TYPE_PRINCIPLED) {
-          int n_lights = int(light_sources[0]);
+        int n_lights = int(light_sources[0]);
+        if(n_lights != 0 && (material.material_type == MATERIAL_TYPE_LAMBERTIAN || material.material_type == MATERIAL_TYPE_PRINCIPLED)) {
           int r = RandomInt(n_lights) + 1;
           int face_cnt = light_sources[2 * r + 1];
           int obj = light_sources[2 * r];
