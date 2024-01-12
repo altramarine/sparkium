@@ -104,14 +104,14 @@ vec3 calculate_brdf(vec3 n, vec3 wi, vec3 wo, float D, vec3 h, float alpha, vec3
 
 float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo, int idx) { // for MIS.
   int n_lights = int(light_sources[0]);
-  if(n_lights != 0) {
-    return idx == 0 ? 1.0f : 0.0f;
+  if(n_lights == 0) {
+    return idx == 1 ? 1.0f : 0.0f;
   }
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
   TraceRay_0(origin, wi);
   Material material = materials[hit_record_0.hit_entity_id];
-  float s[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  float s[2] = {0, 0};
   if (material.material_type == MATERIAL_TYPE_EMISSION) {
     vec3 N = hit_record_0.normal;
     if(dot(wi, N) > 0.0f) {
@@ -132,7 +132,7 @@ float get_pdf_ratio(vec3 origin, vec3 wi /* should be normalized */, vec3 normal
   s[1] = dot(normal, wi) / PI;
   // return 1 - idx;
   // return 1 / 2;
-  // return idx == 1 ? 0.2 : 0.8;
+  // return idx == 1 ? 1.0f : 0.0f;
   return max(0.0f, min(1.0f, s[idx] * s[idx] / (s[0] * s[0] + s[1] * s[1])));
 }
 
@@ -143,14 +143,14 @@ float D_alpha(vec3 wi, vec3 N, vec3 h, float alpha) {
 float get_pdf_ratio_principled(vec3 origin, vec3 wi /* should be normalized */, vec3 normal, vec3 wo,  float alpha, int idx) { // for MIS.
   if(alpha < 0.1f) {return idx == 1 ? 1.0f: 0.0f;}
   int n_lights = int(light_sources[0]);
-  if(n_lights != 0) {
-    return idx == 0 ? 1.0f : 0.0f;
+  if(n_lights == 0) {
+    return idx == 1 ? 1.0f : 0.0f;
   }
   HitRecord hit_record_p = hit_record_0;
   RayPayload rpl = ray_payload;
   TraceRay_0(origin, wi);
   Material material = materials[hit_record_0.hit_entity_id];
-  float s[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  float s[2] = {0.0f, 0.0f};
   if (material.material_type == MATERIAL_TYPE_EMISSION) {
     vec3 N = hit_record_0.normal;
     if(dot(wi, N) > 0.0f) {
@@ -175,6 +175,7 @@ float get_pdf_ratio_principled(vec3 origin, vec3 wi /* should be normalized */, 
   // return 1 - idx;
   // return 1 / 2;
   // return idx == 1 ? 0.2 : 0.8;
+  // return idx == 1 ? 1.0f : 0.0f;
   return max(0.0f, min(1.0f, s[idx] * s[idx] / (s[0] * s[0] + s[1] * s[1])));
 }
 
