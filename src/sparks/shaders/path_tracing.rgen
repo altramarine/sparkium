@@ -485,6 +485,10 @@ void main() {
   vec2 d = inUV * 2.0 - 1.0;
   mat4 camera_to_world = inverse(guo.camera);
   mat4 screen_to_camera = inverse(guo.projection);
+  vec3 camerial_speed = (1.0,0.0,0.0);
+  float remain_time = 10.0;
+  remain_time = remain_time * length(camerial_speed);
+  camerial_speed = normalize(camerial_speed);
   for (int i = 0; i < guo.num_samples; i++) {
     InitRandomSeed(uint(pixelCenter.x), uint(pixelCenter.y),
                    guo.accumulated_sample + i);
@@ -495,8 +499,9 @@ void main() {
     vec2 pixelPoint = vec2(gl_LaunchIDEXT.x + RandomFloat(), gl_LaunchIDEXT.y + RandomFloat()); 
     vec2 inUV = pixelPoint / vec2(gl_LaunchSizeEXT.x, gl_LaunchSizeEXT.y);
     vec2 d = inUV * 2.0 - 1.0;
+    int pre_time = RandomPossion(camerial_speed);
     vec3 o_ = vec3(RandomInCircle() * guo.aperture, 0); // origin
-    vec3 t_ = vec3(screen_to_camera * vec4(d.x, d.y, 1, 1)); // target
+    vec3 t_ = vec3(screen_to_camera * vec4(d.x, d.y, 1, 1)) - pre_time * camerial_speed; // target
     vec3 f_ = normalize(t_) * guo.focal_length; // focal
     vec3 d_ = normalize(f_ - o_); // direct
     vec4 origin = camera_to_world * vec4(o_, 1);
