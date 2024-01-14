@@ -53,14 +53,15 @@ vec3 RandomInSphere() {
   return RandomOnSphere() * pow(RandomFloat(), 0.3333333333333333333);
 }
 
-int RandomPossion(float n){
+float RandomPossion(float n){
   int t = 0;
-  while(t < n){
-    int m = RandomInt(2);
-    if(m == 0){
+  while(t < 10){
+    float m = RandomFloat();
+    if(m < 0.3){
       break;
     }
     t++;
   }
-  return t;
+  float f = t + RandomFloat();
+  return (f / 11) * n;
 }

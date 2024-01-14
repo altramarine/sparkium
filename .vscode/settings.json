@@ -82,6 +82,8 @@
     "xutility": "cpp",
     "bitset": "cpp",
     "*.rgen": "cpp",
-    "*.glsl": "cpp"
-  }
+    "*.glsl": "cpp",
+    "regex": "cpp"
+  },
+  "C_Cpp.default.compilerPath": "cl.exe"
 }

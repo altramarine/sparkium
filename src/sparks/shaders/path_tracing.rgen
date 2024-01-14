@@ -280,7 +280,7 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           radiance += light_sampled * throughput * material.emission * material.emission_strength;
           break;
         } else if (material.material_type == MATERIAL_TYPE_LAMBERTIAN) {
-          hit_record.normal = normalize(hit_record.normal);
+          // hit_record.normal = normalize(hit_record.normal);
           // float phi = RandomFloat() * PI;
           // float rho = RandomFloat() * 2 * PI;
             // // std::cerr << RRR(rd) << std::endl;
@@ -298,12 +298,12 @@ vec3 SampleRay(vec3 origin, vec3 direction) {
           wi = sine * cos(rr2) * dirx + sine * sin(rr2) * diry + cosine * hit_record.normal;
           
           // we get true wi until now. (Cosine-weighted)
-          float pdf = /* 2.0f * sine * cosine */1.0f * cosine * INV_PI;
+          // float pdf = /* 2.0f * sine * cosine */1.0f * cosine * INV_PI;
           // float pdf = 1.0 / (2.0 * PI);
           // this is calculate shading
           throughput *= material.albedo_color * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord));
           // this is calculate shading
-          // throughput *= dot(wi, hit_record.normal) * (material.albedo_color / PI) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f * PI);
+          // throughput *= dot(wi, hit_record.normal) * (material.albedo_color /* * INV_PI */) * vec3(texture(texture_samplers[material.albedo_texture_id],hit_record.tex_coord)) * (2.0f /* * PI */);
           origin = hit_record.position;
           direction = wi;
 
@@ -485,7 +485,8 @@ void main() {
   vec2 d = inUV * 2.0 - 1.0;
   mat4 camera_to_world = inverse(guo.camera);
   mat4 screen_to_camera = inverse(guo.projection);
-  vec3 camerial_speed = (1.0,0.0,0.0);
+  vec3 camerial_speed = vec3(0.0,0.0,0.0);
+  // vec3 camerial_speed = vec3(7.5,0.0,0.0);
   float remain_time = 10.0;
   remain_time = remain_time * length(camerial_speed);
   camerial_speed = normalize(camerial_speed);
@@ -499,12 +500,12 @@ void main() {
     vec2 pixelPoint = vec2(gl_LaunchIDEXT.x + RandomFloat(), gl_LaunchIDEXT.y + RandomFloat()); 
     vec2 inUV = pixelPoint / vec2(gl_LaunchSizeEXT.x, gl_LaunchSizeEXT.y);
     vec2 d = inUV * 2.0 - 1.0;
-    int pre_time = RandomPossion(camerial_speed);
+    float pre_time = RandomPossion(remain_time);
     vec3 o_ = vec3(RandomInCircle() * guo.aperture, 0); // origin
-    vec3 t_ = vec3(screen_to_camera * vec4(d.x, d.y, 1, 1)) - pre_time * camerial_speed; // target
+    vec3 t_ = vec3(screen_to_camera * vec4(d.x, d.y, 1, 1)); // target
     vec3 f_ = normalize(t_) * guo.focal_length; // focal
     vec3 d_ = normalize(f_ - o_); // direct
-    vec4 origin = camera_to_world * vec4(o_, 1);
+    vec4 origin = camera_to_world * vec4(o_, 1) - vec4((pre_time * camerial_speed).xyz, 0.0f);
     vec4 direction = camera_to_world * vec4(d_, 0);
     imageStore(accumulation_color, ivec2(gl_LaunchIDEXT.xy),
                imageLoad(accumulation_color, ivec2(gl_LaunchIDEXT.xy)) +

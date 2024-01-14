@@ -24,7 +24,8 @@ struct Material {
   float iot{1.0f};
   int emission_texture_id{0};
   MaterialType material_type{MATERIAL_TYPE_LAMBERTIAN};
-  float reserve[8]{};
+  glm::vec3 speed{0.0f};
+  float reserve[5]{};
   Material() = default;
   explicit Material(const glm::vec3 &albedo);
   Material(Scene *scene, const tinyxml2::XMLElement *material_element);

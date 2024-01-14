@@ -2,6 +2,7 @@
 <center>Yanpeng Wei, 2021010795</center>
 <center>Yiyin Wang, 2020011604</center>
 
+git：[altramarine/sparkium](https://github.com/altramarine/sparkium)
 
 ### Base
 
@@ -198,6 +199,42 @@ if(n_lights != 0 && (material.material_type == MATERIAL_TYPE_LAMBERTIAN || mater
 ![with_MIS_50_ssp](./imgs/with_MIS_50_ssp.png)
 
 可以看到，收敛更快（我们同时可以从Specular里看出，因为镜面反光没有 Importance Sampling）
+
+### 动态模糊
+
+设置了**相机**的动态模糊，更改相机的速度和remain_time，随机函数并没有使用泊松分布：
+
+```glsl
+float RandomPossion(float n){
+  int t = 0;
+  while(t < 10){
+    float m = RandomFloat();
+    if(m < 0.3){
+      break;
+    }
+    t++;
+  }
+  float f = t + RandomFloat();
+  return (f / 11) * n;
+}
+```
+
+核心代码（在景深的基础上）：
+
+```glsl
+vec3 camerial_speed = vec3(0.0,0.0,0.0);
+// vec3 camerial_speed = vec3(7.5,0.0,0.0);
+float remain_time = 10.0;
+remain_time = remain_time * length(camerial_speed);
+camerial_speed = normalize(camerial_speed);
+
+float pre_time = RandomPossion(remain_time);
+vec4 origin = camera_to_world * vec4(o_, 1) - vec4((pre_time * camerial_speed).xyz, 0.0f);
+```
+
+cornell-box, ```speed = (7.5, 0, 0), remain_time = 10.0```
+
+![speed](./imgs/speed.png)
 
 ### 景深 & 抗锯齿
 
